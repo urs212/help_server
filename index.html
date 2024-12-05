@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>신고 웹사이트</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        form {
+            max-width: 400px;
+            margin: auto;
+            display: flex;
+            flex-direction: column;
+        }
+        label {
+            margin-top: 10px;
+        }
+        input, textarea, button {
+            margin-top: 5px;
+            padding: 10px;
+            font-size: 16px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        #adminPanel {
+            display: none;
+            max-width: 800px;
+            margin: 20px auto;
+        }
+        #adminPassword {
+            max-width: 400px;
+            margin: 20px auto;
+            display: flex;
+            flex-direction: column;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f4f4f4;
+        }
+    </style>
+</head>
+<body>
+    <h1>신고 웹사이트</h1>
+    <form id="reportForm">
+        <label for="nickname">닉네임:</label>
+        <input type="text" id="nickname" name="nickname" required>
+
+        <label for="discord">디스코드 닉네임:</label>
+        <input type="text" id="discord" name="discord" required>
+
+        <label for="description">내용:</label>
+        <textarea id="description" name="description" rows="5" required></textarea>
+
+        <label for="file">영상 또는 사진:</label>
+        <input type="file" id="file" name="file" accept="image/*,video/*">
+
+        <button type="button" onclick="submitReport()">신고하기</button>
+    </form>
+
+    <div id="adminPassword">
+        <label for="password">관리자 비밀번호:</label>
+        <input type="password" id="password">
+        <button type="button" onclick="showAdminPanel()">관리자 모드</button>
+    </div>
+
+    <div id="adminPanel">
+        <h2>신고 내역</h2>
+        <table id="reportTable">
+            <thead>
+                <tr>
+                    <th>닉네임</th>
+                    <th>디스코드 닉네임</th>
+                    <th>내용</th>
+                    <th>파일</th>
+                    <th>시간</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+
+    <script>
+        const adminPassword = "qwertyuiop";
+        const reports = [];
+        const GITHUB_REPO = "사용자/리포지토리"; // 본인 GitHub 리포지토리로 변경
+        const FILE_PATH = "help.json"; // JSON 파일 경로
+        const TOKEN = "YOUR_PERSONAL_ACCESS_TOKEN"; // GitHub Personal Access Token
+
+        async function submitReport() {
+            const nickname = document.getElementById('nickname').value;
+            const discord = document.getElementById('discord').value;
+            const description = document.getElementById('description').value;
+            const fileInput = document.getElementById('file');
+            const file = fileInput.files[0] ? URL.createObjectURL(fileInput.files[0]) : "없음";
+
+            const report = {
+                nickname,
+                discord,
+                description,
+                file,
+                timestamp: new Date().toISOString()
+            };
+
+            reports.push(report);
+            await updateGitHubJSON();
+            alert("신고가 접수되었습니다.");
+        }
+
+        async function updateGitHubJSON() {
+            const url = `https://api.github.com/repos/${GITHUB_REPO}/contents/${FILE_PATH}`;
+            const headers = {
+                "Authorization": `token ${TOKEN}`,
+                "Content-Type": "application/json"
+            };
+
+            // 기존 파일 가져오기
+            const response = await fetch(url, { headers });
+            const fileData = await response.json();
+            const content = JSON.parse(atob(fileData.content));
+
+            // 새로운 신고 추가
+            content.push(...reports);
+
+            // 파일 업데이트
+            const newContent = btoa(JSON.stringify(content, null, 2));
+            await fetch(url, {
+                method: "PUT",
+                headers,
+                body: JSON.stringify({
+                    message: "Update help.json",
+                    content: newContent,
+                    sha: fileData.sha
+                })
+            });
+        }
+
+        function showAdminPanel() {
+            const password = document.getElementById('password').value;
+            if (password === adminPassword) {
+                const adminPanel = document.getElementById('adminPanel');
+                const reportTableBody = document.getElementById('reportTable').querySelector('tbody');
+
+                reportTableBody.innerHTML = '';
+                reports.forEach(report => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${report.nickname}</td>
+                        <td>${report.discord}</td>
+                        <td>${report.description}</td>
+                        <td>${report.file !== "없음" ? `<a href="${report.file}" target="_blank">보기</a>` : "없음"}</td>
+                        <td>${report.timestamp}</td>
+                    `;
+                    reportTableBody.appendChild(row);
+                });
+
+                adminPanel.style.display = 'block';
+            } else {
+                alert("비밀번호가 올바르지 않습니다.");
+            }
+        }
+    </script>
+</body>
+</html>
