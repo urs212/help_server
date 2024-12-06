@@ -100,10 +100,9 @@
 
     <script>
         const adminPassword = "qwertyuiop";
-        const reports = [];
-        const GITHUB_REPO = "사용자/리포지토리"; // 본인 GitHub 리포지토리로 변경
-        const FILE_PATH = "help.json"; // JSON 파일 경로
-        const TOKEN = "YOUR_PERSONAL_ACCESS_TOKEN"; // GitHub Personal Access Token
+        const GITHUB_REPO = "urs212/help_server"; // 본인의 GitHub 리포지토리 경로
+        const FILE_PATH = "help.json"; // 업데이트할 JSON 파일 경로
+        const TOKEN = "YOUR_PERSONAL_ACCESS_TOKEN"; // 생성한 Personal Access Token
 
         async function submitReport() {
             const nickname = document.getElementById('nickname').value;
@@ -120,37 +119,41 @@
                 timestamp: new Date().toISOString()
             };
 
-            reports.push(report);
-            await updateGitHubJSON();
-            alert("신고가 접수되었습니다.");
+            await updateGitHubJSON(report);
+            alert("신고가 완료되었습니다! 디스코드로 결과가 전송됩니다.");
         }
 
-        async function updateGitHubJSON() {
+        async function updateGitHubJSON(newReport) {
             const url = `https://api.github.com/repos/${GITHUB_REPO}/contents/${FILE_PATH}`;
             const headers = {
-                "Authorization": `token ${TOKEN}`,
-                "Content-Type": "application/json"
+                Authorization: `token ${TOKEN}`,
+                "Content-Type": "application/json",
             };
 
-            // 기존 파일 가져오기
-            const response = await fetch(url, { headers });
-            const fileData = await response.json();
-            const content = JSON.parse(atob(fileData.content));
+            try {
+                // 기존 파일 가져오기
+                const response = await fetch(url, { headers });
+                const fileData = await response.json();
+                const content = JSON.parse(atob(fileData.content));
 
-            // 새로운 신고 추가
-            content.push(...reports);
+                // 새로운 데이터 추가
+                content.push(newReport);
 
-            // 파일 업데이트
-            const newContent = btoa(JSON.stringify(content, null, 2));
-            await fetch(url, {
-                method: "PUT",
-                headers,
-                body: JSON.stringify({
-                    message: "Update help.json",
-                    content: newContent,
-                    sha: fileData.sha
-                })
-            });
+                // 파일 업데이트
+                const updatedContent = btoa(JSON.stringify(content, null, 2));
+                await fetch(url, {
+                    method: "PUT",
+                    headers,
+                    body: JSON.stringify({
+                        message: "Update help.json",
+                        content: updatedContent,
+                        sha: fileData.sha,
+                    }),
+                });
+            } catch (error) {
+                console.error("Error updating GitHub JSON:", error);
+                alert("신고 내용을 저장하는 데 실패했습니다. 다시 시도해주세요.");
+            }
         }
 
         function showAdminPanel() {
@@ -159,22 +162,42 @@
                 const adminPanel = document.getElementById('adminPanel');
                 const reportTableBody = document.getElementById('reportTable').querySelector('tbody');
 
-                reportTableBody.innerHTML = '';
-                reports.forEach(report => {
-                    const row = document.createElement('tr');
-                    row.innerHTML = `
-                        <td>${report.nickname}</td>
-                        <td>${report.discord}</td>
-                        <td>${report.description}</td>
-                        <td>${report.file !== "없음" ? `<a href="${report.file}" target="_blank">보기</a>` : "없음"}</td>
-                        <td>${report.timestamp}</td>
-                    `;
-                    reportTableBody.appendChild(row);
-                });
+                fetchReports().then((reports) => {
+                    reportTableBody.innerHTML = '';
+                    reports.forEach(report => {
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td>${report.nickname}</td>
+                            <td>${report.discord}</td>
+                            <td>${report.description}</td>
+                            <td>${report.file !== "없음" ? `<a href="${report.file}" target="_blank">보기</a>` : "없음"}</td>
+                            <td>${report.timestamp}</td>
+                        `;
+                        reportTableBody.appendChild(row);
+                    });
 
-                adminPanel.style.display = 'block';
+                    adminPanel.style.display = 'block';
+                });
             } else {
                 alert("비밀번호가 올바르지 않습니다.");
+            }
+        }
+
+        async function fetchReports() {
+            const url = `https://api.github.com/repos/${GITHUB_REPO}/contents/${FILE_PATH}`;
+            const headers = {
+                Authorization: `token ${TOKEN}`,
+                "Content-Type": "application/json",
+            };
+
+            try {
+                const response = await fetch(url, { headers });
+                const fileData = await response.json();
+                return JSON.parse(atob(fileData.content));
+            } catch (error) {
+                console.error("Error fetching GitHub JSON:", error);
+                alert("신고 내역을 불러오는 데 실패했습니다.");
+                return [];
             }
         }
     </script>
